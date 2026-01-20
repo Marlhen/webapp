@@ -17,7 +17,6 @@ import plotly.io as pio
 st.set_page_config(page_title="Control de Tubería", layout="wide")
 
 # --- 📱 MEJORA MOBILE: INYECCIÓN DE CSS ---
-# Esto elimina los márgenes blancos excesivos laterales y superiores en móviles
 st.markdown("""
     <style>
     /* Reducir el padding del contenedor principal para ganar espacio en móvil */
@@ -27,7 +26,7 @@ st.markdown("""
         padding-left: 0.5rem;
         padding-right: 0.5rem;
     }
-    /* Ajustar tamaño de fuentes en métricas para que no se corten en pantallas pequeñas */
+    /* Ajustar tamaño de fuentes en métricas */
     [data-testid="stMetricValue"] {
         font-size: 1.2rem;
     }
@@ -38,7 +37,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Dashboard de Control de Tubería - Google Drive")
+st.title("📊 Dashboard de Control de Tubería - CPP")
 st.markdown("---")
 
 # --- CONFIGURACIÓN DE GOOGLE SHEETS ---
@@ -47,7 +46,6 @@ SHEET_GID = "1124944326"
 GOOGLE_SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx&gid={SHEET_GID}"
 
 # --- 📱 MEJORA MOBILE: CONFIGURACIÓN PLOTLY ---
-# Configuración para ocultar la barra de herramientas flotante que estorba en táctil
 config_mobile = {
     'displayModeBar': False, 
     'displaylogo': False,
@@ -70,7 +68,7 @@ def adaptar_grafico_mobile(fig):
     return fig
 
 # BOTÓN PARA ACTUALIZAR DATOS MANUALMENTE
-if st.button('🔄 Actualizar Datos Ahora', use_container_width=True): # 📱 Botón ancho completo
+if st.button('🔄 Actualizar Datos Ahora', use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
@@ -79,13 +77,10 @@ if st.button('🔄 Actualizar Datos Ahora', use_container_width=True): # 📱 Bo
 def cargar_datos(archivo_path):
     # Leer sin encabezado para manejar manualmente
     df = pd.read_excel(archivo_path, header=None)
-    # La fila 1 (índice 1) contiene los encabezados reales
     encabezados = df.iloc[1].tolist()
-    # Extraer datos desde la fila 2 (índice 2) en adelante
     df_datos = df.iloc[2:].reset_index(drop=True)
     df_datos.columns = encabezados
 
-    # Identificar columnas de fechas (columnas 10 en adelante con fechas)
     fecha_cols = []
     fecha_cols_display = []
     for i, col in enumerate(encabezados[10:], start=10):
@@ -120,88 +115,67 @@ def cargar_datos(archivo_path):
 
     return df_datos, fecha_cols, fecha_cols_display
 
-# ✅ FUNCIÓN MEJORADA PARA EXPORTAR GRÁFICOS CON CALIDAD
+# ✅ FUNCIÓN PARA EXPORTAR GRÁFICOS
 def exportar_grafico_png(figura, ancho=1200, alto=600):
-    """
-    Exporta un gráfico de Plotly a PNG con calidad óptima y colores preservados
-    """
     try:
         buffer = BytesIO()
-        
-        # ✅ CONFIGURACIÓN CLAVE PARA PRESERVAR COLORES Y FORMATO:
         figura.write_image(
             buffer,
             format='png',
             width=ancho,
             height=alto,
-            scale=2,  # ✅ Aumenta la resolución (2x más nítido)
-            engine='kaleido'  # ✅ Especifica el motor de renderizado
+            scale=2,
+            engine='kaleido'
         )
         buffer.seek(0)
         return buffer
     except Exception as e:
-        # st.warning(f"⚠️ Error exportando gráfico: {str(e)}") # Comentado para no ensuciar UI móvil
         return None
 
 def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_seleccionado, fig_linea, fig_barras, fig_pie, fig_heatmap, fig_acum):
     """Genera un PDF completo con todos los gráficos y tablas"""
     
-    # Crear buffer en memoria para el PDF
     pdf_buffer = BytesIO()
     
-    # Crear documento PDF con orientación horizontal
     doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
                            rightMargin=0.5*inch, leftMargin=0.5*inch,
                            topMargin=0.5*inch, bottomMargin=0.5*inch)
     
-    # Lista para almacenar elementos del PDF
     elements = []
-    
-    # Estilos
     styles = getSampleStyleSheet()
     
-    titulo_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#1f77b4'),
-        spaceAfter=12,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
+    titulo_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#1f77b4'), spaceAfter=12, alignment=TA_CENTER, fontName='Helvetica-Bold')
+    encabezado_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor('#333333'), spaceAfter=8, spaceBefore=8, fontName='Helvetica-Bold')
     
-    encabezado_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.HexColor('#333333'),
-        spaceAfter=8,
-        spaceBefore=8,
-        fontName='Helvetica-Bold'
-    )
-    
-    # Título principal
-    elements.append(Paragraph("📊 DASHBOARD DE CONTROL DE TUBERÍA", titulo_style))
-    elements.append(Paragraph(f"Reporte generado: {datetime.now().strftime('%d/%m/%Y a las %H:%M')}",
-                             styles['Normal']))
+    elements.append(Paragraph("📊 Control de montaje de tuberia - CAD proyectos Perú S.A.C.", titulo_style))
+    elements.append(Paragraph(f"Reporte generado: {datetime.now().strftime('%d/%m/%Y a las %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 0.2*inch))
     
-    # Tipos de línea seleccionados
     tipos_texto = ", ".join(tipo_seleccionado) if tipo_seleccionado else "Todas"
     elements.append(Paragraph(f"Tipos de Línea: {tipos_texto}", styles['Normal']))
     elements.append(Spacer(1, 0.1*inch))
     
-    # Métricas principales
-    total_lineas = len(df_filtrado)
+    # --- 🔄 MODIFICACIÓN PDF: CÁLCULO DE NUEVAS MÉTRICAS ---
+    # 1. Contar tipos de línea únicos
+    num_tipos_linea = df_filtrado['LINEA'].nunique()
+    
+    # 2. Avance total (para añadir 'ml')
     avance_total = df_filtrado[fecha_cols].clip(lower=0).sum().sum()
+    
+    # 3. Longitud Total
     longitud_total = pd.to_numeric(df_filtrado['Longitud Total (m)'], errors='coerce').sum()
-    tipos_servicio = df_filtrado['Servicio'].nunique()
+    
+    # 4. Cálculo de % Global
+    if longitud_total > 0:
+        porcentaje_global = (avance_total / longitud_total) * 100
+    else:
+        porcentaje_global = 0
     
     metricas_data = [
-        ['Total de Líneas', str(total_lineas)],
-        ['Avance Total', f"{int(avance_total):,}"],
+        ['Cant. Tipos de Línea', str(num_tipos_linea)],          # Modificado
+        ['Avance Total', f"{int(avance_total):,} ml"],           # Modificado (ml)
         ['Longitud Total (m)', f"{longitud_total:,.1f}"],
-        ['Tipos de Servicio', str(tipos_servicio)]
+        ['% Avance Global', f"{porcentaje_global:.1f}%"]         # Modificado (% Global)
     ]
     
     table_metricas = Table(metricas_data, colWidths=[3*inch, 3*inch])
@@ -219,121 +193,63 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
     elements.append(Spacer(1, 0.2*inch))
     elements.append(PageBreak())
     
-    # ✅ MEJORADO: Agregar gráfico de línea temporal
+    # ... (Resto de la generación de gráficos PDF igual que antes) ...
     if fig_linea is not None:
         try:
-            # Restaurar configuración para PDF (por si se modificó para móvil)
-            fig_linea.update_layout(
-                paper_bgcolor='white',
-                plot_bgcolor='rgba(240,240,240,0.5)',
-                font=dict(family="Arial", size=11, color='black'),
-                margin=dict(l=50, r=50, t=50, b=50),
-                legend=dict(orientation="v", x=1.02) # Restaurar leyenda vertical para PDF
-            )
-            
+            fig_linea.update_layout(paper_bgcolor='white', plot_bgcolor='rgba(240,240,240,0.5)', font=dict(family="Arial", size=11, color='black'), margin=dict(l=50, r=50, t=50, b=50), legend=dict(orientation="v", x=1.02))
             img_linea = exportar_grafico_png(fig_linea, ancho=1400, alto=500)
             if img_linea:
                 elements.append(Paragraph("Avance Diario Total", encabezado_style))
                 img_obj = Image(img_linea, width=7.5*inch, height=3*inch)
                 elements.append(img_obj)
                 elements.append(Spacer(1, 0.2*inch))
-        except:
-            elements.append(Paragraph("❌ No se pudo incluir gráfico de línea temporal", styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
+        except: pass
     
-    # ✅ MEJORADO: Agregar gráfico de barras
     if fig_barras is not None:
         try:
-            # ✅ Aplicar tema blanco para mejor contraste
-            fig_barras.update_layout(
-                paper_bgcolor='white',
-                plot_bgcolor='rgba(240,240,240,0.5)',
-                font=dict(family="Arial", size=11, color='black'),
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
-            
+            fig_barras.update_layout(paper_bgcolor='white', plot_bgcolor='rgba(240,240,240,0.5)', font=dict(family="Arial", size=11, color='black'), margin=dict(l=50, r=50, t=50, b=50))
             img_barras = exportar_grafico_png(fig_barras, ancho=1400, alto=500)
             if img_barras:
                 elements.append(Paragraph("Avance por Tipo de Línea", encabezado_style))
                 img_obj = Image(img_barras, width=7.5*inch, height=3*inch)
                 elements.append(img_obj)
                 elements.append(Spacer(1, 0.2*inch))
-        except:
-            elements.append(Paragraph("❌ No se pudo incluir gráfico de barras", styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
+        except: pass
     
     elements.append(PageBreak())
     
-    # ✅ MEJORADO: Agregar gráfico de pastel
     if fig_pie is not None:
         try:
-            # ✅ Aplicar tema blanco
-            fig_pie.update_layout(
-                paper_bgcolor='white',
-                font=dict(family="Arial", size=11, color='black'),
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
-            
+            fig_pie.update_layout(paper_bgcolor='white', font=dict(family="Arial", size=11, color='black'), margin=dict(l=50, r=50, t=50, b=50))
             img_pie = exportar_grafico_png(fig_pie, ancho=1200, alto=600)
             if img_pie:
                 elements.append(Paragraph("Distribución por Servicio", encabezado_style))
                 img_obj = Image(img_pie, width=6.5*inch, height=3.25*inch)
                 elements.append(img_obj)
                 elements.append(Spacer(1, 0.2*inch))
-        except:
-            elements.append(Paragraph("❌ No se pudo incluir gráfico de pastel", styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
+        except: pass
     
-    # Tabla de porcentajes
     elements.append(Paragraph("Tabla de Porcentajes de Avance", encabezado_style))
-    
     avance_por_linea = []
     for linea in df_filtrado['LINEA'].unique():
         if pd.notna(linea):
             df_linea = df_filtrado[df_filtrado['LINEA'] == linea]
             avance_limpio = df_linea[fecha_cols].clip(lower=0).sum().sum()
             longitud_total_linea = pd.to_numeric(df_linea['Longitud Total (m)'], errors='coerce').sum()
-            
-            if longitud_total_linea > 0:
-                porcentaje_avance = (avance_limpio / longitud_total_linea) * 100
-            else:
-                porcentaje_avance = 0
-            
+            porcentaje_avance = (avance_limpio / longitud_total_linea) * 100 if longitud_total_linea > 0 else 0
             if avance_limpio > 0 or longitud_total_linea > 0:
-                avance_por_linea.append({
-                    'Tipo de Línea': linea,
-                    'Avance': avance_limpio,
-                    'Longitud Total': longitud_total_linea,
-                    'Porcentaje': porcentaje_avance
-                })
+                avance_por_linea.append({'Tipo de Línea': linea, 'Avance': avance_limpio, 'Longitud Total': longitud_total_linea, 'Porcentaje': porcentaje_avance})
     
     df_por_linea = pd.DataFrame(avance_por_linea)
-    
     if not df_por_linea.empty:
         df_por_linea = df_por_linea.sort_values('Avance', ascending=False)
-        
-        # Preparar datos para tabla
         tabla_data = [['Tipo de Línea', 'Avance', 'Longitud (m)', '% Avance']]
         for _, row in df_por_linea.iterrows():
-            tabla_data.append([
-                row['Tipo de Línea'][:30],
-                f"{int(row['Avance']):,}",
-                f"{row['Longitud Total']:.1f}",
-                f"{row['Porcentaje']:.1f}%"
-            ])
-        
-        # Agregar fila de totales
+            tabla_data.append([row['Tipo de Línea'][:30], f"{int(row['Avance']):,}", f"{row['Longitud Total']:.1f}", f"{row['Porcentaje']:.1f}%"])
         total_avance = df_por_linea['Avance'].sum()
         total_longitud = df_por_linea['Longitud Total'].sum()
         total_porcentaje = (total_avance / total_longitud * 100) if total_longitud > 0 else 0
-        
-        tabla_data.append([
-            '📊 TOTAL',
-            f"{int(total_avance):,}",
-            f"{total_longitud:.1f}",
-            f"{total_porcentaje:.1f}%"
-        ])
-        
+        tabla_data.append(['📊 TOTAL', f"{int(total_avance):,}", f"{total_longitud:.1f}", f"{total_porcentaje:.1f}%"])
         table_porcentajes = Table(tabla_data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.2*inch])
         table_porcentajes.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
@@ -347,58 +263,34 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F0F0F0')])
         ]))
-        
         elements.append(table_porcentajes)
         elements.append(Spacer(1, 0.2*inch))
     
     elements.append(PageBreak())
-    
-    # ✅ MEJORADO: Agregar heatmap
     if fig_heatmap is not None:
         try:
-            # ✅ Aplicar tema blanco
-            fig_heatmap.update_layout(
-                paper_bgcolor='white',
-                font=dict(family="Arial", size=11, color='black'),
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
-            
+            fig_heatmap.update_layout(paper_bgcolor='white', font=dict(family="Arial", size=11, color='black'), margin=dict(l=50, r=50, t=50, b=50))
             img_heatmap = exportar_grafico_png(fig_heatmap, ancho=1400, alto=600)
             if img_heatmap:
                 elements.append(Paragraph("Mapa de Calor - Intensidad de Avance", encabezado_style))
                 img_obj = Image(img_heatmap, width=7.5*inch, height=3*inch)
                 elements.append(img_obj)
                 elements.append(Spacer(1, 0.2*inch))
-        except:
-            elements.append(Paragraph("❌ No se pudo incluir mapa de calor", styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
+        except: pass
     
-    # ✅ MEJORADO: Agregar gráfico acumulado
     if fig_acum is not None:
         try:
-            # ✅ Aplicar tema blanco
-            fig_acum.update_layout(
-                paper_bgcolor='white',
-                plot_bgcolor='rgba(240,240,240,0.5)',
-                font=dict(family="Arial", size=11, color='black'),
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
-            
+            fig_acum.update_layout(paper_bgcolor='white', plot_bgcolor='rgba(240,240,240,0.5)', font=dict(family="Arial", size=11, color='black'), margin=dict(l=50, r=50, t=50, b=50))
             img_acum = exportar_grafico_png(fig_acum, ancho=1400, alto=500)
             if img_acum:
                 elements.append(Paragraph("Progreso Acumulado", encabezado_style))
                 img_obj = Image(img_acum, width=7.5*inch, height=3*inch)
                 elements.append(img_obj)
                 elements.append(Spacer(1, 0.2*inch))
-        except:
-            elements.append(Paragraph("❌ No se pudo incluir gráfico acumulado", styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
+        except: pass
     
     elements.append(PageBreak())
-    
-    # Tabla detallada por tipo de línea
     elements.append(Paragraph("Detalle por Tipo de Línea y Día", encabezado_style))
-    
     tabla_resumen = []
     for linea in df_filtrado['LINEA'].unique():
         if pd.notna(linea):
@@ -411,29 +303,20 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
                     fecha_corta = fecha_cols_display[i] if i < len(fecha_cols_display) else fecha_col
                     fila[fecha_corta] = int(valor)
                     total_linea += valor
-            
             if total_linea > 0:
                 fila['Total'] = int(total_linea)
                 tabla_resumen.append(fila)
-    
     if tabla_resumen:
         df_tabla = pd.DataFrame(tabla_resumen)
         cols = [c for c in df_tabla.columns if c != 'Total']
-        if 'Total' in df_tabla.columns:
-            cols.append('Total')
+        if 'Total' in df_tabla.columns: cols.append('Total')
         df_tabla = df_tabla[cols]
-        
-        # Limitar columnas mostradas (máximo 6 fechas + línea + total)
         cols_mostradas = [df_tabla.columns[0]] + list(df_tabla.columns[-7:])
         df_tabla_reducida = df_tabla[cols_mostradas] if len(df_tabla.columns) > 8 else df_tabla
-        
         tabla_data = [list(df_tabla_reducida.columns)]
-        for _, row in df_tabla_reducida.iterrows():
-            tabla_data.append([str(v) for v in row])
-        
+        for _, row in df_tabla_reducida.iterrows(): tabla_data.append([str(v) for v in row])
         col_widths = [2*inch] + [0.6*inch] * (len(tabla_data[0]) - 1)
         table_resumen = Table(tabla_data, colWidths=col_widths)
-        
         table_resumen.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -444,44 +327,31 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F0F0F0')])
         ]))
-        
         elements.append(table_resumen)
         elements.append(Spacer(1, 0.2*inch))
     
     elements.append(Spacer(1, 0.3*inch))
-    elements.append(Paragraph(f"Documento generado automáticamente el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}",
-                             styles['Normal']))
-    
-    # Construir PDF
+    elements.append(Paragraph(f"Documento generado automáticamente el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}", styles['Normal']))
     doc.build(elements)
     pdf_buffer.seek(0)
-    
     return pdf_buffer
 
-# --- MODIFICACIÓN: CARGA DE ARCHIVOS ---
+# --- SIDEBAR ---
 st.sidebar.header("📁 Fuente de Datos")
 st.sidebar.info(f"Conectado a Google Sheets")
 
-# Opción para subir archivo manual si el usuario lo desea (fallback)
 archivo_subido = st.sidebar.file_uploader("O cargar archivo manual (opcional)", type=['xlsx', 'xls'])
-
 if archivo_subido is not None:
-    # Si el usuario sube un archivo, usamos ese
     archivo_path = archivo_subido
     st.sidebar.success("Usando archivo subido manualmente")
 else:
-    # Por defecto, usamos el link de Google Drive
     archivo_path = GOOGLE_SHEET_URL
 
-# Cargar datos
 try:
     with st.spinner('Cargando datos desde Google Sheets...'):
         df, fecha_cols, fecha_cols_display = cargar_datos(archivo_path)
-    
-    # Verificar si cargó desde Drive o Manual para el mensaje
     origen = "Google Sheets" if archivo_subido is None else "Archivo Local"
     st.sidebar.success(f"✅ Datos cargados de {origen}: {len(df)} líneas")
-
 except Exception as e:
     st.error(f"❌ Error al cargar los datos: {str(e)}")
     st.info("💡 Si usas Google Sheets, asegúrate de que el archivo sea público o accesible mediante enlace.")
@@ -503,31 +373,36 @@ if not tipo_seleccionado:
 # Filtrar datos
 df_filtrado = df[df['LINEA'].isin(tipo_seleccionado)]
 
-# Métricas principales
+# --- 🔄 MODIFICACIÓN DASHBOARD: MÉTRICAS ---
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    total_lineas = len(df_filtrado)
-    st.metric("Total de Líneas", total_lineas)
+    # 1. Contar el tipo de líneas (únicas)
+    num_tipos_linea = df_filtrado['LINEA'].nunique()
+    st.metric("Cant. Tipos de Línea", num_tipos_linea)
 
 with col2:
+    # 2. Agregar unidad (ml)
     avance_total = df_filtrado[fecha_cols].clip(lower=0).sum().sum()
-    st.metric("Avance Total", f"{int(avance_total):,}")
+    st.metric("Avance Total", f"{int(avance_total):,} ml")
 
 with col3:
     longitud_total = pd.to_numeric(df_filtrado['Longitud Total (m)'], errors='coerce').sum()
     st.metric("Longitud Total (m)", f"{longitud_total:,.1f}")
 
 with col4:
-    tipos_servicio = df_filtrado['Servicio'].nunique()
-    st.metric("Tipos de Servicio", tipos_servicio)
+    # 3. Cambiar Tipos de Servicio por % Avance Global
+    if longitud_total > 0:
+        pct_global = (avance_total / longitud_total) * 100
+    else:
+        pct_global = 0
+    st.metric("% Avance Global", f"{pct_global:.1f}%")
 
 st.markdown("---")
 
 # Análisis por día
 st.header("📈 Avance por Día")
 
-# Preparar datos para gráfico de línea temporal
 avance_diario = []
 for i, fecha_col in enumerate(fecha_cols):
     valor = df_filtrado[fecha_col].clip(lower=0).sum()
@@ -554,7 +429,6 @@ if not df_avance.empty:
         texttemplate='%{text:.0f}'
     )
     
-    # ✅ AGREGAR CONFIGURACIÓN BLANCA AL LAYOUT
     fig_linea.update_layout(
         height=400,
         hovermode='x unified',
@@ -564,7 +438,6 @@ if not df_avance.empty:
         font=dict(family="Arial", size=12, color='#333333')
     )
     
-    # 📱 MEJORA MOBILE: Aplicar helper
     fig_linea = adaptar_grafico_mobile(fig_linea)
     st.plotly_chart(fig_linea, use_container_width=True, config=config_mobile)
 else:
@@ -580,7 +453,6 @@ fig_barras = None
 fig_pie = None
 
 with col_left:
-    # Avance por tipo de línea
     avance_por_linea = []
     for linea in df_filtrado['LINEA'].unique():
         if pd.notna(linea):
@@ -624,7 +496,6 @@ with col_left:
             customdata=df_por_linea[['Longitud Total']].values
         )
         
-        # ✅ AGREGAR CONFIGURACIÓN BLANCA AL LAYOUT
         fig_barras.update_layout(
             height=400,
             paper_bgcolor='white',
@@ -632,14 +503,11 @@ with col_left:
             font=dict(family="Arial", size=12, color='#333333')
         )
         
-        # 📱 MEJORA MOBILE: Aplicar helper
         fig_barras = adaptar_grafico_mobile(fig_barras)
         st.plotly_chart(fig_barras, use_container_width=True, config=config_mobile)
         
-        # Mostrar tabla resumen
         with st.expander("📊 Ver tabla de porcentajes de avance"):
             df_tabla_linea = df_por_linea[['Tipo de Línea', 'Avance', 'Longitud Total', 'Porcentaje']].copy()
-            
             total_avance_tabla = df_tabla_linea['Avance'].sum()
             total_longitud_tabla = df_tabla_linea['Longitud Total'].sum()
             
@@ -674,7 +542,6 @@ with col_left:
             )
 
 with col_right:
-    # Distribución por servicio
     avance_por_servicio = []
     for servicio in sorted(df_filtrado['Servicio'].dropna().unique()):
         avance_limpio = df_filtrado[df_filtrado['Servicio'] == servicio][fecha_cols].clip(lower=0).sum().sum()
@@ -684,7 +551,6 @@ with col_right:
     
     if not df_por_servicio.empty:
         df_por_servicio = df_por_servicio.sort_values('Avance', ascending=False)
-        
         total_avance_servicio = df_por_servicio['Avance'].sum()
         
         if total_avance_servicio > 0:
@@ -708,7 +574,6 @@ with col_right:
             hovertemplate='%{label}Avance: %{value}'
         )
         
-        # ✅ AGREGAR CONFIGURACIÓN BLANCA AL LAYOUT
         fig_pie.update_layout(
             height=400,
             showlegend=True,
@@ -716,7 +581,6 @@ with col_right:
             font=dict(family="Arial", size=11, color='#333333')
         )
         
-        # 📱 MEJORA MOBILE: Aplicar helper
         fig_pie = adaptar_grafico_mobile(fig_pie)
         st.plotly_chart(fig_pie, use_container_width=True, config=config_mobile)
 
@@ -747,7 +611,6 @@ if tabla_resumen:
     if 'Total' in df_tabla.columns:
         cols.append('Total')
     df_tabla = df_tabla[cols]
-    
     st.dataframe(df_tabla, use_container_width=True, height=400)
 else:
     st.info("No hay datos resumidos para mostrar.")
@@ -781,7 +644,6 @@ if matriz_datos:
         hovertemplate='Línea: %{y}Fecha: %{x}Avance: %{z}'
     ))
     
-    # ✅ AGREGAR CONFIGURACIÓN BLANCA AL LAYOUT
     fig_heatmap.update_layout(
         title='Intensidad de Avance Diario',
         xaxis_title='Fecha (día/mes)',
@@ -792,7 +654,6 @@ if matriz_datos:
         font=dict(family="Arial", size=11, color='#333333')
     )
     
-    # 📱 MEJORA MOBILE: Aplicar helper
     fig_heatmap = adaptar_grafico_mobile(fig_heatmap)
     st.plotly_chart(fig_heatmap, use_container_width=True, config=config_mobile)
 else:
@@ -834,7 +695,6 @@ if not df_avance.empty:
         hovertemplate='Fecha: %{x}Acumulado: %{y}'
     ))
     
-    # ✅ AGREGAR CONFIGURACIÓN BLANCA AL LAYOUT
     fig_acum.update_layout(
         title='Avance Diario vs Avance Acumulado',
         xaxis_title='Fecha (día/mes)',
@@ -848,9 +708,7 @@ if not df_avance.empty:
         font=dict(family="Arial", size=12, color='#333333')
     )
     
-    # 📱 MEJORA MOBILE: Aplicar helper
     fig_acum = adaptar_grafico_mobile(fig_acum)
-    # Pequeño ajuste adicional para el segundo eje en mobile
     fig_acum.update_layout(margin=dict(r=40))
     st.plotly_chart(fig_acum, use_container_width=True, config=config_mobile)
 
@@ -880,7 +738,6 @@ if tabla_servicio:
     if 'Total' in df_tabla_servicio.columns:
         cols.append('Total')
     df_tabla_servicio = df_tabla_servicio[cols]
-    
     st.dataframe(df_tabla_servicio, use_container_width=True, height=400)
 else:
     st.info("No hay datos resumidos por servicio para mostrar.")
@@ -897,7 +754,6 @@ else:
     cols_principales = ['LINEA', 'Linea TAG', 'Servicio', 'Longitud Total (m)']
     cols_con_datos = [col for col in fecha_cols if df_filtrado[col].clip(lower=0).sum() > 0]
     cols_mostrar = cols_principales + cols_con_datos
-    
     st.dataframe(df_filtrado[cols_mostrar], use_container_width=True, height=400)
 
 # Estadísticas adicionales
@@ -933,11 +789,10 @@ with col_stat4:
     else:
         st.metric("Línea Más Avanzada", "N/A")
 
-# ✅ SECCIÓN DE EXPORTACIÓN A PDF MEJORADA
+# ✅ SECCIÓN DE EXPORTACIÓN A PDF
 st.markdown("---")
 st.header("📥 Descargar Reporte")
 
-# 📱 MEJORA MOBILE: Botón ancho completo
 if st.button("📄 Generar y Descargar PDF", key="btn_pdf", use_container_width=True):
     st.info("⏳ Generando PDF con gráficos de alta calidad... Por favor espera...")
     
@@ -948,7 +803,6 @@ if st.button("📄 Generar y Descargar PDF", key="btn_pdf", use_container_width=
             fig_heatmap, fig_acum
         )
         
-        # Crear nombre del archivo con fecha y hora
         fecha_hora = datetime.now().strftime("%d%m%Y_%H%M%S")
         nombre_archivo = f"Reporte_Tuberia_{fecha_hora}.pdf"
         
@@ -969,4 +823,4 @@ if st.button("📄 Generar y Descargar PDF", key="btn_pdf", use_container_width=
 
 # Footer
 st.markdown("---")
-st.markdown("**Dashboard desarrollado para análisis de control de tubería** | Última actualización: " + datetime.now().strftime("%d/%m/%Y %H:%M"))
+st.markdown("**Dashboard desarrollado para análisis de control de tubería por CPP ** | Última actualización: " + datetime.now().strftime("%d/%m/%Y %H:%M"))
