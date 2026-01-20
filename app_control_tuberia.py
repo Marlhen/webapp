@@ -37,7 +37,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Dashboard de Control de Tubería - CPP")
+st.title("📊 Dashboard de Control de Tubería - Google Drive")
 st.markdown("---")
 
 # --- CONFIGURACIÓN DE GOOGLE SHEETS ---
@@ -147,7 +147,7 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
     titulo_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#1f77b4'), spaceAfter=12, alignment=TA_CENTER, fontName='Helvetica-Bold')
     encabezado_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor('#333333'), spaceAfter=8, spaceBefore=8, fontName='Helvetica-Bold')
     
-    elements.append(Paragraph("📊 Control de montaje de tuberia - CAD proyectos Perú S.A.C.", titulo_style))
+    elements.append(Paragraph("📊 DASHBOARD DE CONTROL DE TUBERÍA", titulo_style))
     elements.append(Paragraph(f"Reporte generado: {datetime.now().strftime('%d/%m/%Y a las %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 0.2*inch))
     
@@ -155,27 +155,20 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
     elements.append(Paragraph(f"Tipos de Línea: {tipos_texto}", styles['Normal']))
     elements.append(Spacer(1, 0.1*inch))
     
-    # --- 🔄 MODIFICACIÓN PDF: CÁLCULO DE NUEVAS MÉTRICAS ---
-    # 1. Contar tipos de línea únicos
+    # --- MÉTRICAS ---
     num_tipos_linea = df_filtrado['LINEA'].nunique()
-    
-    # 2. Avance total (para añadir 'ml')
     avance_total = df_filtrado[fecha_cols].clip(lower=0).sum().sum()
-    
-    # 3. Longitud Total
     longitud_total = pd.to_numeric(df_filtrado['Longitud Total (m)'], errors='coerce').sum()
-    
-    # 4. Cálculo de % Global
     if longitud_total > 0:
         porcentaje_global = (avance_total / longitud_total) * 100
     else:
         porcentaje_global = 0
     
     metricas_data = [
-        ['Cant. Tipos de Línea', str(num_tipos_linea)],          # Modificado
-        ['Avance Total', f"{int(avance_total):,} ml"],           # Modificado (ml)
+        ['Cant. Tipos de Línea', str(num_tipos_linea)],
+        ['Avance Total', f"{int(avance_total):,} ml"],
         ['Longitud Total (m)', f"{longitud_total:,.1f}"],
-        ['% Avance Global', f"{porcentaje_global:.1f}%"]         # Modificado (% Global)
+        ['% Avance Global', f"{porcentaje_global:.1f}%"]
     ]
     
     table_metricas = Table(metricas_data, colWidths=[3*inch, 3*inch])
@@ -193,7 +186,6 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
     elements.append(Spacer(1, 0.2*inch))
     elements.append(PageBreak())
     
-    # ... (Resto de la generación de gráficos PDF igual que antes) ...
     if fig_linea is not None:
         try:
             fig_linea.update_layout(paper_bgcolor='white', plot_bgcolor='rgba(240,240,240,0.5)', font=dict(family="Arial", size=11, color='black'), margin=dict(l=50, r=50, t=50, b=50), legend=dict(orientation="v", x=1.02))
@@ -373,16 +365,14 @@ if not tipo_seleccionado:
 # Filtrar datos
 df_filtrado = df[df['LINEA'].isin(tipo_seleccionado)]
 
-# --- 🔄 MODIFICACIÓN DASHBOARD: MÉTRICAS ---
+# --- DASHBOARD: MÉTRICAS ---
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    # 1. Contar el tipo de líneas (únicas)
     num_tipos_linea = df_filtrado['LINEA'].nunique()
     st.metric("Cant. Tipos de Línea", num_tipos_linea)
 
 with col2:
-    # 2. Agregar unidad (ml)
     avance_total = df_filtrado[fecha_cols].clip(lower=0).sum().sum()
     st.metric("Avance Total", f"{int(avance_total):,} ml")
 
@@ -391,7 +381,6 @@ with col3:
     st.metric("Longitud Total (m)", f"{longitud_total:,.1f}")
 
 with col4:
-    # 3. Cambiar Tipos de Servicio por % Avance Global
     if longitud_total > 0:
         pct_global = (avance_total / longitud_total) * 100
     else:
@@ -565,7 +554,8 @@ with col_right:
         fig_pie = px.pie(df_por_servicio,
                         values='Avance',
                         names='Label',
-                        title='Distribución por Tamaño de Servicio',
+                        # 🔥 QUITAMOS EL TÍTULO DE AQUÍ PARA PONERLO MANUALMENTE ABAJO
+                        # title='Distribución por Tamaño de Servicio', 
                         hole=0.3)
         
         fig_pie.update_traces(
@@ -582,6 +572,20 @@ with col_right:
         )
         
         fig_pie = adaptar_grafico_mobile(fig_pie)
+        
+        # 🔥 CORRECCIÓN TÍTULO: Aumentar margen superior y ajustar posición del título
+        # Esto soluciona que el título invada el gráfico
+        fig_pie.update_layout(
+            margin=dict(t=60, b=10, l=10, r=10), # Aumentamos margen superior
+            title=dict(
+                text='Distribución por Tamaño de Servicio',
+                y=0.95,  # Lo subimos casi al borde
+                x=0.5,   # Lo centramos
+                xanchor='center',
+                yanchor='top'
+            )
+        )
+        
         st.plotly_chart(fig_pie, use_container_width=True, config=config_mobile)
 
 # Tabla detallada
@@ -823,4 +827,4 @@ if st.button("📄 Generar y Descargar PDF", key="btn_pdf", use_container_width=
 
 # Footer
 st.markdown("---")
-st.markdown("**Dashboard desarrollado para análisis de control de tubería por CPP ** | Última actualización: " + datetime.now().strftime("%d/%m/%Y %H:%M"))
+st.markdown("**Dashboard desarrollado para análisis de control de tubería** | Última actualización: " + datetime.now().strftime("%d/%m/%Y %H:%M"))
