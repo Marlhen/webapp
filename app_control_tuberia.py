@@ -155,7 +155,7 @@ def generar_pdf_reporte(df_filtrado, fecha_cols, fecha_cols_display, tipo_selecc
     elements.append(Paragraph(f"Tipos de Línea: {tipos_texto}", styles['Normal']))
     elements.append(Spacer(1, 0.1*inch))
     
-    # --- MÉTRICAS ---
+    # --- MÉTRICAS PARA PDF ---
     num_tipos_linea = df_filtrado['LINEA'].nunique()
     avance_total = df_filtrado[fecha_cols].clip(lower=0).sum().sum()
     longitud_total = pd.to_numeric(df_filtrado['Longitud Total (m)'], errors='coerce').sum()
@@ -365,7 +365,7 @@ if not tipo_seleccionado:
 # Filtrar datos
 df_filtrado = df[df['LINEA'].isin(tipo_seleccionado)]
 
-# --- DASHBOARD: MÉTRICAS ---
+# --- MÉTRICAS DASHBOARD ---
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -551,11 +551,11 @@ with col_right:
             lambda row: f"{row['Servicio']} ({row['Porcentaje']}%)", axis=1
         )
         
+        # 🔥 FIX: Ajuste específico para Distribución por Servicio (título abajo, leyenda arriba)
         fig_pie = px.pie(df_por_servicio,
                         values='Avance',
                         names='Label',
-                        # 🔥 QUITAMOS EL TÍTULO DE AQUÍ PARA PONERLO MANUALMENTE ABAJO
-                        # title='Distribución por Tamaño de Servicio', 
+                        # Eliminamos título de aquí para ponerlo manualmente
                         hole=0.3)
         
         fig_pie.update_traces(
@@ -565,27 +565,31 @@ with col_right:
         )
         
         fig_pie.update_layout(
+            # Configuramos título ABAJO
+            title=dict(
+                text='Distribución por Tamaño de Servicio',
+                y=0.01,
+                x=0.5,
+                xanchor='center',
+                yanchor='bottom'
+            ),
+            # Configuramos leyenda ARRIBA
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02, 
+                xanchor="center",
+                x=0.5
+            ),
             height=400,
             showlegend=True,
             paper_bgcolor='white',
-            font=dict(family="Arial", size=11, color='#333333')
+            font=dict(family="Arial", size=11, color='#333333'),
+            # Márgenes personalizados para este gráfico
+            margin=dict(l=10, r=10, t=30, b=40) 
         )
         
-        fig_pie = adaptar_grafico_mobile(fig_pie)
-        
-        # 🔥 CORRECCIÓN TÍTULO: Aumentar margen superior y ajustar posición del título
-        # Esto soluciona que el título invada el gráfico
-        fig_pie.update_layout(
-            margin=dict(t=60, b=10, l=10, r=10), # Aumentamos margen superior
-            title=dict(
-                text='Distribución por Tamaño de Servicio',
-                y=0.95,  # Lo subimos casi al borde
-                x=0.5,   # Lo centramos
-                xanchor='center',
-                yanchor='top'
-            )
-        )
-        
+        # No usamos el adaptador genérico para no sobrescribir esta config específica
         st.plotly_chart(fig_pie, use_container_width=True, config=config_mobile)
 
 # Tabla detallada
