@@ -37,7 +37,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Dashboard de Control de Tubería - CPP")
+st.title("📊 Dashboard de Control de Tubería - CPP desarrollado por Marlhen Estrada")
 st.markdown("---")
 
 # --- CONFIGURACIÓN DE GOOGLE SHEETS ---
